@@ -18,6 +18,38 @@ parameters:
   # dotnet-build-bot-dotnet-eng-status-token
 
 stages:
+- stage: Pre_Deploy_Tests
+  displayName: Pre-Deployment Validation
+  pool:
+    name: Hosted VS2017
+  dependsOn:
+  - Build
+  jobs:
+  - job: Validate_Existing_Services
+    pool:
+      name: Hosted VS2017
+    steps:
+    - download: current
+      artifact: ValidationScripts
+    - task: ServiceFabricPowerShell@1
+      displayName: 'Validate Service Fabric Applications'
+      inputs:
+        clusterConnection: ${{ parameters.ServiceFabricConnection }}
+        scriptPath: '$(Pipeline.Workspace)/ValidationScripts/PreDeployCheckServiceFabric.ps1'
+    - task: AzurePowerShell@1
+      displayName: 'Validate HMS Deployment'
+      inputs:
+        ConnectedServiceName: ${{ parameters.ConnectedServiceName }}
+        ScriptPath: '$(Pipeline.Workspace)/ValidationScripts/Pre-DeployCheckHMS.ps1'
+        ScriptArguments: '-service ${{ parameters.HMSServiceName }} -slot Production'
+    - task: AzureCLI@2
+      displayName: Validate Resource Groups and Storage Accounts
+      inputs:
+        azureSubscription: ${{ parameters.AzureSubscription }}
+        scriptType: ps
+        scriptPath: $(Pipeline.Workspace)/ValidationScripts/Pre-DeployCheckResources.ps1
+        arguments: '-environment ${{ parameters.DeploymentEnvironment }}'
+
 - stage: predeploy
   displayName: Pre-Deployment
   pool:
